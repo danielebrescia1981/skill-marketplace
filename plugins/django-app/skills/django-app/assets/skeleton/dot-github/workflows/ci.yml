@@ -1,0 +1,52 @@
+# The gate: lint, checks and tests on every push and PR. Branch protection on `test`
+# and `main` requires this job, so nothing reaches a deploy workflow without it.
+name: CI
+
+on:
+  push:
+    branches-ignore: [test]   # deploy-test.yml calls this workflow itself on test
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: myapp
+          POSTGRES_USER: myapp
+          POSTGRES_PASSWORD: myapp
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U myapp -d myapp"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APP_ENVIRONMENT: dev
+      SECRET_KEY: ci-only
+      # [tenant]
+      DATABASE_URL: postgres://myapp_app:myapp_app@localhost:5432/myapp
+      ADMIN_DATABASE_URL: postgres://myapp_admin:myapp_admin@localhost:5432/myapp
+      # [/tenant]
+      # [!tenant]
+      DATABASE_URL: postgres://myapp:myapp@localhost:5432/myapp
+      # [/!tenant]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      # [tenant]
+      # Same two roles as local dev (service containers can't mount init scripts).
+      - name: Create DB roles
+        run: |
+          sudo apt-get install -y --no-install-recommends postgresql-client >/dev/null
+          PGPASSWORD=myapp POSTGRES_USER=myapp POSTGRES_DB=myapp PGHOST=localhost \
+            bash scripts/create-db-roles.sh
+      # [/tenant]
+      - run: uv sync --frozen
+      - run: just check
+      - run: just test

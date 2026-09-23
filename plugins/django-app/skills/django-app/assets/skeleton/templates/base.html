@@ -1,0 +1,23 @@
+{% load static %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ PRODUCT_NAME }}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/output.css' %}">
+  {# Vendored + version-pinned so CSP can stay 'self' (just vendor). #}
+  <script src="{% static 'vendor/htmx-2.0.4.min.js' %}" nonce="{{ csp_nonce }}" defer></script>
+  <script src="{% static 'vendor/alpine-3.14.9.min.js' %}" nonce="{{ csp_nonce }}" defer></script>
+</head>
+<body class="h-full bg-white text-gray-900 antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <main class="mx-auto max-w-5xl p-6">
+    {% if messages %}
+      <ul class="mb-4 space-y-2">{% for m in messages %}<li class="rounded border p-3">{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="mx-auto max-w-5xl p-6 text-xs text-gray-500">
+    {{ PRODUCT_NAME }} {{ APP_VERSION }}{% if APP_ENVIRONMENT != "prod" %} · {{ APP_ENVIRONMENT }}{% endif %}
+  </footer>
+</body>
+</html>

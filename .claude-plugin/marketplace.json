@@ -55,6 +55,13 @@
       "category": "development",
       "source": "./plugins/herdr",
       "strict": true
+    },
+    {
+      "name": "django-app",
+      "description": "Create, extend, or audit Django 6 apps the house way. A qualifying interview (tenant-based? SSO? GxP? Stripe? API?) decides which reference modules load, so simple apps never pull in RLS or Part 11 context. Ships a tested, renderable project skeleton (uv/src layout, justfile, Postgres-only infra, django-rls two-role tenancy, promote-by-digest deploys), distilled from appsfolio, eqms, gxpsign, meetingsignals and refractions.",
+      "category": "development",
+      "source": "./plugins/django-app",
+      "strict": true
     }
   ]
 }

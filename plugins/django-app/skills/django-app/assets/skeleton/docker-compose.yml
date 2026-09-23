@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:18
+    container_name: myapp-postgres
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: myapp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-myapp}
+      # [tenant]
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-myapp_app}
+      ADMIN_DB_PASSWORD: ${ADMIN_DB_PASSWORD:-myapp_admin}
+      # [/tenant]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      # [tenant]
+      # Mount only the role-init script, not all of ./scripts. Runs once per fresh volume.
+      - ./scripts/create-db-roles.sh:/docker-entrypoint-initdb.d/create-db-roles.sh:ro
+      # [/tenant]
+    ports:
+      - "__DB_PORT__:5432"   # unique per app on this machine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myapp -d myapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: myapp-mailpit
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+
+  # The real image, for a local smoke test: docker compose --profile app up --build
+  web:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment: &app-env
+      # [tenant]
+      DATABASE_URL: postgres://myapp_app:${APP_DB_PASSWORD:-myapp_app}@db:5432/myapp
+      ADMIN_DATABASE_URL: postgres://myapp_admin:${ADMIN_DB_PASSWORD:-myapp_admin}@db:5432/myapp
+      # [/tenant]
+      # [!tenant]
+      DATABASE_URL: postgres://myapp:${DB_PASSWORD:-myapp}@db:5432/myapp
+      # [/!tenant]
+      EMAIL_HOST: mailpit
+    ports:
+      - "8001:8000"
+    depends_on:
+      db: {condition: service_healthy}
+
+  worker:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment: *app-env
+    command: python manage.py procrastinate worker
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  postgres_data:

@@ -1,0 +1,189 @@
+# MyApp — task runner. `just` lists recipes.
+# Conditional blocks: [x] = keep only if feature x is on; [!x] = keep only if off. Strip markers after.
+
+set shell := ["bash", "-uc"]
+set dotenv-load := false
+
+APP := "myapp"
+DEV_PORT := "__DEV_PORT__"
+SERVER := "__SERVER__"   # ssh host alias of the deploy box
+TAILWIND_VERSION := "v4.1.13"
+MANAGE := "uv run python manage.py"
+# [tenant]
+# Migrations always run as the admin (table-owner, BYPASSRLS) role.
+MIGRATE_DB := "--database=admin"
+# [/tenant]
+# [!tenant]
+MIGRATE_DB := ""
+# [/!tenant]
+
+default:
+    @just --list
+
+# ----- Setup ---------------------------------------------------------------
+
+# First-time setup: deps, CSS binary, database, migrations
+setup: install db migrate
+    @echo "Ready. 'just dev' to start."
+
+# Install Python deps (+ dev group), the pinned Tailwind binary and vendored JS
+install: tailwind-setup vendor
+    uv sync
+    uv run pre-commit install
+
+# Download pinned HTMX + Alpine into static/vendor (commit them; CSP stays 'self')
+vendor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p static/vendor
+    get() { [ -f "static/vendor/$1" ] || curl -sSLf -o "static/vendor/$1" "$2"; }
+    get htmx-2.0.4.min.js https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js
+    get alpine-3.14.9.min.js https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js
+
+# Download the pinned Tailwind standalone CLI (idempotent; no Node needed)
+tailwind-setup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bin=bin/tailwindcss
+    if [ -x "$bin" ] && "$bin" --help 2>/dev/null | grep -q "{{TAILWIND_VERSION}}"; then exit 0; fi
+    case "$(uname -s)-$(uname -m)" in
+      Darwin-arm64) asset=tailwindcss-macos-arm64 ;;
+      Darwin-x86_64) asset=tailwindcss-macos-x64 ;;
+      Linux-x86_64) asset=tailwindcss-linux-x64 ;;
+      Linux-aarch64) asset=tailwindcss-linux-arm64 ;;
+      *) echo "unsupported platform"; exit 1 ;;
+    esac
+    mkdir -p bin
+    curl -sSLf -o "$bin" "https://github.com/tailwindlabs/tailwindcss/releases/download/{{TAILWIND_VERSION}}/$asset"
+    chmod +x "$bin"
+
+# ----- Dev -----------------------------------------------------------------
+
+# Run everything (web, CSS watch, worker[, stripe]) with prefixed output. Ctrl+C stops all.
+dev: db css
+    #!/usr/bin/env bash
+    set -uo pipefail
+    command -v portless >/dev/null || { echo "portless not installed: npm install -g portless"; exit 1; }
+    # `portless proxy status` isn't a real subcommand — probe the proxy instead.
+    proxy_up() { curl -sk -o /dev/null --max-time 3 https://{{APP}}.localhost/; }
+    # Only sudo when the proxy is down, so `just dev` doesn't ask for a password every run.
+    proxy_up || sudo portless proxy start --https -p 443 --wildcard || true
+    {{MANAGE}} migrate {{MIGRATE_DB}}
+    echo ""
+    echo "  App:      https://{{APP}}.localhost/"
+    # [tenant]
+    echo "  Tenant:   https://<tenant>.{{APP}}.localhost/"
+    # [/tenant]
+    echo "  Mailpit:  http://localhost:8025/"
+    echo ""
+    trap 'just stop; exit 0' INT TERM
+    (portless {{APP}} bash -c '{{MANAGE}} runserver $HOST:$PORT' 2>&1 | sed 's/^/[django]   /') &
+    (bin/tailwindcss -i static/css/input.css -o static/css/output.css --watch 2>&1 | sed 's/^/[css]      /') &
+    ({{MANAGE}} procrastinate worker 2>&1 | sed 's/^/[worker]   /') &
+    # [stripe]
+    (stripe listen --forward-to https://{{APP}}.localhost/billing/webhook/ --skip-verify 2>&1 | sed 's/^/[stripe]   /') &
+    # [/stripe]
+    wait
+
+# Plain runserver on a fixed port (no proxy)
+runserver:
+    {{MANAGE}} runserver 127.0.0.1:{{DEV_PORT}}
+
+# Stop dev processes (database keeps running; `just db-stop` for that)
+stop:
+    -@pkill -f "manage.py runserver" 2>/dev/null || true
+    -@pkill -f "manage.py procrastinate" 2>/dev/null || true
+    -@pkill -f "tailwindcss.*--watch" 2>/dev/null || true
+    -@pkill -f "stripe listen" 2>/dev/null || true
+
+worker:
+    {{MANAGE}} procrastinate worker
+
+shell:
+    {{MANAGE}} shell
+
+# ----- Database ------------------------------------------------------------
+
+db:
+    docker compose up -d --wait db mailpit
+
+db-stop:
+    docker compose down
+
+db-logs:
+    docker compose logs -f db
+
+# Destroy and recreate the local database volume
+db-reset:
+    #!/usr/bin/env bash
+    read -p "Drop ALL local data for {{APP}}? [y/N] " ok; [ "$ok" = "y" ] || exit 1
+    docker compose down -v && just db && just migrate
+
+db-shell:
+    docker compose exec db psql -U {{APP}} -d {{APP}}
+
+migrate:
+    {{MANAGE}} migrate {{MIGRATE_DB}}
+
+makemigrations *ARGS:
+    {{MANAGE}} makemigrations {{ARGS}}
+
+# Idempotent: create or reset the superuser (and its verified EmailAddress)
+superuser EMAIL:
+    {{MANAGE}} ensure_superuser {{EMAIL}}
+
+# ----- Frontend & docs -----------------------------------------------------
+
+css: tailwind-setup
+    bin/tailwindcss -i static/css/input.css -o static/css/output.css --minify
+
+help-build:
+    uvx zensical build
+
+help-serve:
+    uvx zensical serve -a localhost:8021
+
+# ----- Quality -------------------------------------------------------------
+
+test *ARGS:
+    uv run pytest {{ARGS}}
+
+lint:
+    uv run ruff check .
+
+format:
+    uv run ruff check --fix . && uv run ruff format .
+
+typecheck:
+    uv run mypy src
+
+# Everything CI runs
+check: lint
+    {{MANAGE}} check
+    {{MANAGE}} makemigrations --check --dry-run
+
+e2e *ARGS:
+    DJANGO_SETTINGS_MODULE=config.settings_e2e uv run pytest tests/e2e {{ARGS}}
+
+# [gxp]
+# Validation evidence against a deployed environment (see references/gxp.md)
+val-oq ENV="test":
+    uv run pytest -c validation/pytest.ini validation/oq_{{ENV}} --gxp --gxp-strict --junitxml=gxp_report_files/oq_{{ENV}}.xml | tee gxp_report_files/oq_{{ENV}}.log
+# [/gxp]
+
+# ----- Remote ops (compose stacks live in the devmo_apps repo) --------------
+
+# Run a manage.py command on a deployed env: just remote test showmigrations
+remote ENV *ARGS:
+    ssh -t {{SERVER}} "docker exec -it {{APP}}-{{ENV}}-app python manage.py {{ARGS}}"
+
+# Curl /ht/ on a deployed env
+health ENV="prod":
+    #!/usr/bin/env bash
+    host=$([ "{{ENV}}" = prod ] && echo "myapp.com" || echo "test.myapp.com")
+    curl -fsS "https://$host/ht/" && echo " ← /ht/ ok"
+
+# Clean build artefacts (not the database)
+clean:
+    find . -name __pycache__ -type d -prune -exec rm -rf {} +
+    rm -rf staticfiles help_site .pytest_cache

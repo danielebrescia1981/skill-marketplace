@@ -12,6 +12,7 @@ A [Claude Code](https://claude.com/claude-code) plugin marketplace hosting perso
 | [`design-md`](plugins/design-md) | Author, extract, and maintain a project-level `DESIGN.md` following the Google [design.md](https://github.com/google-labs-code/design.md) spec. Creates a single source of truth for brand, color tokens, typography, spacing, and components — and wires `CLAUDE.md` to reference it on every design decision. |
 | [`uv`](plugins/uv) | Checks whether the [`uv`](https://github.com/astral-sh/uv) Python package manager is installed and installs it if missing, ensuring it's on `PATH`. Used as a prerequisite by other skills that run Python, or when a `pip install` is requested. |
 | [`html-app`](plugins/html-app) | Build elaborate, self-contained single-file HTML app artifacts for claude.ai using React, TypeScript, Tailwind CSS v4, and shadcn/ui. Scaffolds a Vite project with 56 pre-installed components, then bundles everything (JS, CSS, assets) into one inlined HTML file. _Adapted from Anthropic's [`web-artifacts-builder`](https://github.com/anthropics/skills) (Apache 2.0), modernized to Node 20+ / Tailwind v4 / React 19._ |
+| [`django-app`](plugins/django-app) | Create, extend, or audit Django 6 apps using house conventions. Qualifying questions (tenant-based → django-rls, SSO, GxP, Stripe, API/MCP) select which reference modules load, so unneeded context stays out. Includes a tested project skeleton rendered by `scripts/render.py`: uv + `src/` layout, justfile, portless HTTPS, Procrastinate + DatabaseCache on Postgres, Tailwind standalone + HTMX, GHCR deploys with promote-by-digest. |
 
 ## Use it
 
@@ -39,6 +40,7 @@ Other supported sources:
 /plugin install design-md@skill-marketplace
 /plugin install uv@skill-marketplace
 /plugin install html-app@skill-marketplace
+/plugin install django-app@skill-marketplace
 /reload-plugins
 ```
 

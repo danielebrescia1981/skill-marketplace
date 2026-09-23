@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+@source "../../templates";
+@source "../../src";
+
+/* Mirror DESIGN.md tokens here (design-md skill). */
+@theme {
+  --color-brand-600: oklch(0.55 0.15 250);
+  --font-sans: system-ui, sans-serif;
+}

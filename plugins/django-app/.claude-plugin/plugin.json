@@ -1,0 +1,9 @@
+{
+  "name": "django-app",
+  "description": "Create or retrofit a Django 6 SaaS app the house way: a short qualifying interview (tenant-based? SSO? GxP? billing? API?) picks which modules load, so a simple app never pulls in RLS or Part 11 context. Covers uv/src layout, env-driven settings, justfile, portless local HTTPS, Postgres-only infra (Procrastinate, DatabaseCache), django-rls two-role tenancy, per-tenant SSO, Stripe, GHCR + SSH deploys with promote-by-digest, and repo conventions distilled from appsfolio, eqms, gxpsign, meetingsignals and refractions.",
+  "version": "1.0.0",
+  "author": {
+    "name": "William Hayes",
+    "email": "william.s.hayes@gmail.com"
+  }
+}

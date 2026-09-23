@@ -1,0 +1,7 @@
+# [help]
+[project]
+site_name = "MyApp Help"
+site_url = "/help/"
+docs_dir = "help"
+site_dir = "help_site"
+# [/help]

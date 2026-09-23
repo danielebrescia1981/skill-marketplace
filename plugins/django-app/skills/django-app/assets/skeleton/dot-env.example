@@ -1,0 +1,31 @@
+# Copy to .env for local dev. Every key the app reads is listed here; prod/test values
+# live in the server-side .env of the compose stack, never in git.
+# Comments go on their own lines: env parsers disagree about inline comments.
+
+# dev | test | prod
+APP_ENVIRONMENT=dev
+DEBUG=true
+# Required whenever DEBUG is off
+SECRET_KEY=
+PRODUCT_NAME=MyApp
+# prod: myapp.com
+BASE_DOMAIN=myapp.localhost
+
+# [tenant]
+DATABASE_URL=postgres://myapp_app:myapp_app@localhost:__DB_PORT__/myapp
+ADMIN_DATABASE_URL=postgres://myapp_admin:myapp_admin@localhost:__DB_PORT__/myapp
+# [/tenant]
+# [!tenant]
+DATABASE_URL=postgres://myapp:myapp@localhost:__DB_PORT__/myapp
+# [/!tenant]
+
+# Mailpit in dev. test/prod default to ACTUAL_EMAIL_BACKEND=django_ses.SESBackend with
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SES_REGION_NAME, MAIL_DOMAIN.
+EMAIL_HOST=localhost
+EMAIL_PORT=1025
+
+# test/prod only
+SENTRY_DSN=
+# Flip to true once pages are clean under report-only
+CSP_ENFORCE=false
+# SECURITY_HARDENING defaults to `not DEBUG`

@@ -1,0 +1,71 @@
+[project]
+name = "myapp"
+version = "0.1.0"
+description = "MyApp"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1,<7.0",   # 6.1: MAILERS
+    "django-environ",
+    "psycopg[binary]",
+    "gunicorn",
+    "whitenoise[brotli]",
+    "django-allauth",
+    "django-crispy-forms",
+    "crispy-tailwind",
+    "django-htmx",
+    "procrastinate[django]",
+    "django-ses[events]",
+    "sentry-sdk[django]",
+    # [tenant]
+    "django-rls>=2.0",   # 2.x: Django 6 support + DJANGO_RLS settings to disable the unsafe receivers
+    # [/tenant]
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-django",
+    "pytest-mock",
+    "factory-boy",
+    "ruff",
+    "mypy",
+    "django-browser-reload",
+    "pre-commit",
+]
+
+# No [build-system]: uv treats this as a virtual project (deps only, nothing to build).
+# Code is imported from src/ via pythonpath (pytest), manage.py and PYTHONPATH (Docker).
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["I"]
+extend-select = ["E", "F", "W", "UP"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["config", "accounts"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/config/settings*.py" = ["E402", "F405"]
+
+[tool.mypy]
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = ["migrations/"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings_test"
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "--strict-markers --ignore=tests/e2e"
+markers = [
+    "unit",
+    "integration",
+    "e2e",
+    "security",
+    "slow",
+]
