@@ -25,6 +25,7 @@ The skill works for:
 7. **Self-check** every finding against the source text (Step 7)
 8. **Render** the Word review report (Step 8)
 9. **Hand off** with summary and offer follow-ups (Step 9)
+10. change
 
 ---
 
